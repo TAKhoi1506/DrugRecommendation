@@ -1,0 +1,142 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Quản lý thuốc - Admin{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 100px auto; padding: 20px;">
+    
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; padding: 25px; border-radius: 10px; margin-bottom: 25px; text-align: center;">
+        <h1><i class="fas fa-pills"></i> Quản lý Database Thuốc</h1>
+        <p>Thêm, sửa, xóa thông tin thuốc trong hệ thống</p>
+    </div>
+
+    <!-- Flash Messages -->
+    <div class="alerts">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" 
+                         data-alert-type="{{ category }}"
+                         data-message="{{ message|e }}">
+                        <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' }}"></i>
+                        <span>{{ message }}</span>
+                        <button type="button" data-dismiss="alert">&times;</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; justify-content: space-between; margin-bottom: 25px; gap: 15px; flex-wrap: wrap;">
+        
+        <!-- Search -->
+        <div style="display: flex; gap: 10px; flex: 1; max-width: 400px;">
+            <input type="text" 
+                   id="searchInput" 
+                   placeholder="Tìm kiếm thuốc..." 
+                   value="{{ search }}"
+                   style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px;"
+                   onkeypress="if(event.key==='Enter') searchDrugs()">
+            <button onclick="searchDrugs()" style="padding: 10px 15px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                <i class="fas fa-search"></i> Tìm
+            </button>
+        </div>
+        
+        <!-- Add Drug -->
+        <a href="{{ url_for('add_drug') }}" style="padding: 10px 15px; background: #27ae60; color: white; text-decoration: none; border-radius: 6px;">
+            <i class="fas fa-plus"></i> Thêm thuốc
+        </a>
+    </div>
+
+    <!-- Drugs Table -->
+    <div style="background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa;">
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">ID</th>
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">Tên thuốc</th>
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">Phân loại</th>
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">Chỉ định</th>
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if drugs %}
+                    {% for drug in drugs %}
+                    <tr style="border-bottom: 1px solid #eee;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                        <td style="padding: 12px 10px;">{{ drug.id }}</td>
+                        <td style="padding: 12px 10px;">
+                            <div style="font-weight: 600; color: #2c3e50;">{{ drug.drug_name }}</div>
+                        </td>
+                        <td style="padding: 12px 10px;">{{ drug.drug_class or 'Chưa phân loại' }}</td>
+                        <td style="padding: 12px 10px;">
+                            {{ (drug.indication[:80] + '...') if drug.indication and drug.indication|length > 80 else (drug.indication or 'Chưa có') }}
+                        </td>
+                        <td style="padding: 12px 10px;">
+                            <form method="POST" 
+                                  action="{{ url_for('delete_drug_route', drug_id=drug.id) }}" 
+                                  style="display: inline;" 
+                                  data-drug-name="{{ drug.drug_name|e }}"
+                                  onsubmit="return confirmDelete(this)">
+                                <button type="submit" 
+                                        style="padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    <i class="fas fa-trash"></i> Xóa
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: #6c757d;">
+                            <i class="fas fa-pills fa-3x" style="margin-bottom: 15px; opacity: 0.3;"></i>
+                            <p>Chưa có thuốc nào trong hệ thống</p>
+                            <a href="{{ url_for('add_drug') }}" style="padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 6px;">
+                                <i class="fas fa-plus"></i> Thêm thuốc đầu tiên
+                            </a>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Stats -->
+    <div style="text-align: center; margin-top: 25px; color: #6c757d;">
+        <p>Tổng cộng: {{ drugs|length }} thuốc {% if search %}(tìm kiếm: "{{ search }}"){% endif %}</p>
+    </div>
+
+    <!-- Back to Admin -->
+    <div style="text-align: center; margin-top: 25px;">
+        <a href="{{ url_for('admin_dashboard') }}" style="padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 6px;">
+            <i class="fas fa-arrow-left"></i> Về Admin Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+    function searchDrugs() {
+        const searchTerm = document.getElementById('searchInput').value;
+        const url = new URL(window.location);
+        
+        if (searchTerm.trim()) {
+            url.searchParams.set('search', searchTerm);
+        } else {
+            url.searchParams.delete('search');
+        }
+        
+        window.location.href = url.toString();
+    }
+    
+    function confirmDelete(form) {
+        const drugName = form.getAttribute('data-drug-name');
+        return confirm(`Bạn có chắc muốn xóa thuốc "${drugName}"?\n\nHành động này không thể hoàn tác!`);
+    }
+
+    document.querySelectorAll('[data-dismiss="alert"]').forEach(btn => {
+    btn.onclick = () => btn.closest('.alert').remove(); 
+    });
+</script>
+{% endblock %}

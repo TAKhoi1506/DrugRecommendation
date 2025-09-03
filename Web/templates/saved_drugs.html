@@ -1,0 +1,312 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Thuốc đã lưu - DrugRecommend{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/saved_drugs.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="saved-container">
+    <div class="saved-header">
+        <h1><i class="fas fa-bookmark"></i> Thuốc đã lưu</h1>
+        <p>Danh sách các thuốc bạn đã lưu từ kết quả tìm kiếm</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="saved-stats">
+        <div class="stat-card">
+            <h3><i class="fas fa-pills"></i> Tổng thuốc đã lưu</h3>
+            <div class="stat-value">{{ saved_drugs|length }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-calendar"></i> Lưu gần đây</h3>
+            <div class="stat-value">
+                {% set recent_count = saved_drugs|selectattr('saved_at')|list|length %}
+                {{ recent_count }}
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Drugs List -->
+    {% if saved_drugs %}
+        <div class="saved-drugs-grid">
+            {% for drug in saved_drugs %}
+            <div class="saved-drug-card">
+                <div class="drug-header">
+                    <div class="drug-summary">
+                        <div class="drug-name">{{ drug.drug_name }}</div>
+                        <div class="drug-meta">
+                            <span class="drug-class">{{ drug.drug_class or 'Tổng hợp' }}</span>
+                            {% if drug.score %}
+                                <span class="score-badge">Score: {{ drug.score }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="saved-info">
+                    <h5><i class="fas fa-clock"></i> Thông tin lưu</h5>
+                    <div class="saved-date">
+                        <i class="fas fa-calendar-alt"></i> 
+                        Lưu lúc: {{ drug.saved_at }}
+                    </div>
+                    {% if drug.symptoms %}
+                    <div class="symptoms-used">
+                        <i class="fas fa-stethoscope"></i> 
+                        Triệu chứng: {{ drug.symptoms }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if drug.notes %}
+                <div class="notes-section">
+                    <strong>Ghi chú:</strong>
+                    <p>{{ drug.notes }}</p>
+                </div>
+                {% endif %}
+
+                
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-bookmark"></i>
+            <h3>Chưa có thuốc nào được lưu</h3>
+            <p>Hãy tìm kiếm thuốc và lưu những kết quả hữu ích!</p>
+            <a href="{{ url_for('index') }}" class="back-to-search">
+                <i class="fas fa-search"></i> Bắt đầu tìm kiếm
+            </a>
+        </div>
+    {% endif %}
+
+    {% if saved_drugs %}
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="{{ url_for('index') }}" class="back-to-search">
+            <i class="fas fa-search"></i> Tìm kiếm thêm thuốc
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Functions cho saved drugs page
+function removeSavedDrug(drugIndex) {
+    if (!confirm('Bạn có chắc muốn xóa thuốc này khỏi danh sách?')) {
+        return;
+    }
+    
+    fetch('/remove_saved_drug', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ drug_index: drugIndex })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification('Lỗi: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Lỗi kết nối: ' + error.message, 'error');
+    });
+}
+
+function addNotes(drugIndex) {
+    const notes = prompt('Nhập ghi chú cho thuốc này:');
+    if (notes !== null && notes.trim()) {
+        showNotification('Chức năng cập nhật ghi chú sẽ được bổ sung!', 'info');
+    }
+}
+
+// Drug detail modal function
+function showDrugDetail(drugIndex, drugName) {
+    // Tạo modal đơn giản
+    const modal = document.createElement('div');
+    modal.className = 'drug-detail-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        backdrop-filter: blur(5px);
+    `;
+    
+    modal.innerHTML = `
+        <div style="
+            background: white;
+            border-radius: 15px;
+            max-width: 900px;
+            max-height: 90vh;
+            width: 90%;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        ">
+            <div style="
+                background: linear-gradient(45deg, #2c3e50, #34495e);
+                color: white;
+                padding: 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <h2 style="margin: 0; font-size: 1.5em;">
+                    <i class="fas fa-pills"></i> Chi tiết thuốc: ${drugName}
+                </h2>
+                <span style="font-size: 28px; cursor: pointer; line-height: 1; opacity: 0.8;" onclick="this.closest('.drug-detail-modal').remove()">&times;</span>
+            </div>
+            <div style="padding: 25px; max-height: calc(90vh - 80px); overflow-y: auto;">
+                <div style="text-align: center; padding: 40px; color: #6c757d;">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p>Đang tải thông tin...</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Load drug detail
+    fetch(`/drug/${drugIndex}`)
+        .then(response => response.json())
+        .then(drug => {
+            if (drug.error) {
+                throw new Error(drug.error);
+            }
+            
+            const content = modal.querySelector('div[style*="padding: 25px"]');
+            content.innerHTML = `
+                <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; border-radius: 10px; margin-bottom: 25px;">
+                    <h3 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 1.4em;">${drug.name}</h3>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <span style="background: #e9ecef; color: #495057; padding: 6px 12px; border-radius: 15px; font-size: 12px; font-weight: bold;">${drug.drug_class}</span>
+                        <span style="background: #28a745; color: white; padding: 6px 12px; border-radius: 15px; font-size: 12px; font-weight: bold;">${drug.price}</span>
+                    </div>
+                    <div style="color: #6c757d; margin-top: 15px;">
+                        <i class="fas fa-building"></i> <strong>Nhà sản xuất:</strong> ${drug.manufacturer}
+                    </div>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <h4 style="color: #2c3e50; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 8px;">
+                        <i class="fas fa-info-circle"></i> Chỉ định & Công dụng
+                    </h4>
+                    <ul style="padding-left: 20px; line-height: 1.6;">
+                        ${drug.indication_list.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <div style="background: #fff3cd; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <h4 style="color: #856404; margin-bottom: 15px;">
+                        <i class="fas fa-flask"></i> Thành phần chính
+                    </h4>
+                    <ul style="padding-left: 20px; line-height: 1.6;">
+                        ${drug.ingredients_list.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <div style="background: #f8d7da; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <h4 style="color: #721c24; margin-bottom: 15px;">
+                        <i class="fas fa-exclamation-triangle"></i> Chống chỉ định & Cảnh báo
+                    </h4>
+                    <ul style="padding-left: 20px; line-height: 1.6;">
+                        ${drug.contraindication_list.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <div style="background: #d4edda; padding: 15px; border-radius: 8px; color: #155724;">
+                    <i class="fas fa-shield-alt"></i>
+                    <strong>An toàn:</strong> Tham khảo ý kiến bác sĩ trước khi sử dụng
+                </div>
+            `;
+        })
+        .catch(error => {
+            const content = modal.querySelector('div[style*="padding: 25px"]');
+            content.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #e74c3c;">
+                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    <p>Lỗi tải thông tin: ${error.message}</p>
+                </div>
+            `;
+        });
+    
+    // Close on click outside
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    };
+}
+
+// Notification function
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${message}</span>
+    `;
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: slideIn 0.3s ease-out;
+        min-width: 250px;
+    `;
+    
+    // Add animation styles if not exists
+    if (!document.getElementById('notification-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-styles';
+        styles.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-out forwards';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+</script>
+{% endblock %}
