@@ -163,18 +163,19 @@ function displayResults(data) {
                                 ${drug.ingredients_list && drug.ingredients_list.length > 2 ? '<li class="more-info">... và các thành phần khác</li>' : ''}
                             </ul>
                         </div>
-                        <div class="detail-section dosage">
-                            <h4><i class="fas fa-pills"></i> Liều dùng</h4>
-                            <ul class="detail-list">
-                                ${formatListItems(drug.dosage_list ? drug.dosage_list.slice(0, 2) : ['Theo chỉ định của bác sĩ'])}
-                                ${drug.dosage_list && drug.dosage_list.length > 2 ? '<li class="more-info">Xem chi tiết đầy đủ để biết thêm</li>' : ''}
-                            </ul>
-                        </div>
                         <div class="detail-section contraindications">
                             <h4><i class="fas fa-exclamation-triangle"></i> Chống chỉ định</h4>
                             <ul class="detail-list">
                                 ${formatListItems(drug.contraindication_list ? drug.contraindication_list.slice(0, 2) : ['Không có thông tin'])}
                                 ${drug.contraindication_list && drug.contraindication_list.length > 2 ? '<li class="more-info">... và các chống chỉ định khác</li>' : ''}
+                            </ul>
+                        </div>
+
+                        <div class="detail-section side-effects">
+                            <h4><i class="fas fa-exclamation-circle"></i> Tác dụng phụ</h4>
+                            <ul class="detail-list">
+                                ${formatListItems(drug.side_effects_list ? drug.side_effects_list.slice(0, 3) : ['Không có thông tin'])}
+                                ${drug.side_effects_list && drug.side_effects_list.length > 3 ? '<li class="more-info">... và các tác dụng phụ khác</li>' : ''}
                             </ul>
                         </div>
                     </div>
@@ -449,11 +450,11 @@ function displayDrugDetail(drug, modal) {
                     <button class="tab-btn" data-tab="ingredients">
                         <i class="fas fa-flask"></i> Thành phần
                     </button>
-                    <button class="tab-btn" data-tab="dosage">
-                        <i class="fas fa-pills"></i> Cách dùng
-                    </button>
                     <button class="tab-btn" data-tab="contraindications">
-                        <i class="fas fa-exclamation-triangle"></i> Chống chỉ định
+                        <i class="fas fa-ban"></i> Chống chỉ định
+                    </button>
+                    <button class="tab-btn" data-tab="side-effects">
+                        <i class="fas fa-warning"></i> Tác dụng phụ
                     </button>
                 </div>
                 
@@ -472,16 +473,6 @@ function displayDrugDetail(drug, modal) {
                         </ul>
                     </div>
                     
-                    <div class="tab-content" id="dosage">
-                        <h4>Liều dùng & Cách sử dụng</h4>
-                        <ul class="detail-list dosage-list">
-                            ${formatListItems(drug.dosage_list || ['Theo chỉ định của bác sĩ'])}
-                        </ul>
-                        <div class="dosage-warning">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <strong>Lưu ý:</strong> Tuân thủ đúng liều lượng theo chỉ định của bác sĩ
-                        </div>
-                    </div>
                     
                     <div class="tab-content" id="contraindications">
                         <h4>Chống chỉ định & Cảnh báo</h4>
@@ -491,6 +482,17 @@ function displayDrugDetail(drug, modal) {
                         <div class="safety-note">
                             <i class="fas fa-shield-alt"></i>
                             <strong>An toàn:</strong> Tham khảo ý kiến bác sĩ trước khi sử dụng
+                        </div>
+                    </div>
+
+                     <div class="tab-content" id="side-effects">
+                        <h4>Tác dụng phụ có thể gặp</h4>
+                        <ul class="detail-list side-effects-list">
+                            ${formatListItems(drug.side_effects_list || ['Không có thông tin'])}
+                        </ul>
+                        <div class="side-effects-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Lưu ý:</strong> Nếu gặp tác dụng phụ nghiêm trọng, ngừng dùng thuốc và liên hệ bác sĩ ngay
                         </div>
                     </div>
                 </div>
@@ -621,8 +623,7 @@ function showNotification(message, type = 'info') {
     }
     
     document.body.appendChild(notification);
-    
-    // Auto remove after 3 seconds
+
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease-out forwards';
         setTimeout(() => {

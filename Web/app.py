@@ -4,6 +4,7 @@ import pickle
 import joblib
 import os
 import re
+import math
 import numpy as np
 from scipy.sparse import hstack
 from utils import classify_drug_type
@@ -401,6 +402,7 @@ class EnhancedDrugRecommendationEngine:
         row = self.data_final.iloc[idx]
         return self._get_drug_info(idx, row)
     
+    
     def get_dataset_stats(self):
         """Thống kê dataset"""
         if self.data_final is None:
@@ -555,7 +557,6 @@ def search():
 def search_history_page():
     try:
         user_id = session['user_id']
-        # Lấy lịch sử tìm kiếm (50 lần gần nhất)
         history = get_search_history(user_id, limit=50)
         # Lấy thống kê đơn giản
         stats = get_search_statistics(user_id)
@@ -637,20 +638,20 @@ def repeat_search(history_id):
 @app.route('/drug/<int:drug_id>')
 def drug_detail(drug_id):
     try:
-        drug = engine.get_enhanced_drug_info(drug_id)
-        return jsonify(drug)
+        drug_info = engine.get_enhanced_drug_info(drug_id)
+        if drug_info:
+            return jsonify(drug_info)
+        else:
+            return jsonify({'error': 'Không tìm thấy thông tin thuốc'})
     except Exception as e:
-        return jsonify({'error': f'Không tìm thấy thuốc: {str(e)}'})
+        print(f"Error in drug_detail: {e}")
+        return jsonify({'error': f'Lỗi tải thông tin: {str(e)}'})
+    
 
 @app.route('/debug')
 def debug():
     stats = engine.get_dataset_stats()
     return jsonify(stats)
-
-@app.route('/stats')
-def stats():
-    """API endpoint để lấy thống kê dataset"""
-    return jsonify(engine.get_dataset_stats())
 
 @app.route('/save_drug', methods=['POST'])
 @login_required
@@ -854,45 +855,138 @@ def change_password_route():
         return redirect(url_for('profile'))
 
 
-# @app.route('/admin/users')
-# @admin_required
-# def admin_users():
-#     """Quản lý người dùng (placeholder)"""
-#     flash('Chức năng quản lý người dùng đang được phát triển', 'info')
-#     return redirect(url_for('admin_dashboard'))
+@app.route('/drugs')
+def all_drugs():
+    try:
+        drugs = []
+        
+        if engine.data_final is not None:
+            df = engine.data_final
+            search = request.args.get('search', '')
+            page = int(request.args.get('page', 1))
+            per_page = 50
+            
+            # Lọc theo tìm kiếm
+            if search:
+                mask = df['ten_thuoc'].str.contains(search, case=False, na=False) | \
+                       df['chi_dinh'].str.contains(search, case=False, na=False)
+                filtered_df = df[mask]
+            else:
+                filtered_df = df
+            
 
-# @app.route('/admin/analytics')
-# @admin_required
-# def admin_analytics():
-#     """Trang analytics (placeholder)"""
-#     flash('Chức năng thống kê chi tiết đang được phát triển', 'info')
-#     return redirect(url_for('admin_dashboard'))
+            # Phân trang
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            paged_df = filtered_df.iloc[start_idx:end_idx]
 
-# @app.route('/admin/settings')
-# @admin_required
-# def system_settings():
-#     """Cài đặt hệ thống (placeholder)"""
-#     flash('Chức năng cài đặt hệ thống đang được phát triển', 'info')
-#     return redirect(url_for('admin_dashboard'))
+            for idx, row in paged_df.iterrows():
+                drug_name = str(row['ten_thuoc']) if pd.notna(row['ten_thuoc']) else f"Thuốc {idx}"
+                
+                drug_info = {
+                    'index': idx,  # Sử dụng index gốc từ DataFrame
+                    'drug_name': drug_name,
+                    'drug_class': engine._classify_drug_from_name(drug_name),
+                    'indication': str(row['chi_dinh']) if pd.notna(row['chi_dinh']) else 'Không có thông tin',
+                    'ingredients': str(row['thanh_phan']) if pd.notna(row['thanh_phan']) else 'Không có thông tin',
+                    'contraindication': str(row['chong_chi_dinh']) if pd.notna(row['chong_chi_dinh']) else 'Không có thông tin',
+                    'side_effects': str(row['tac_dung_phu']) if pd.notna(row['tac_dung_phu']) else 'Không có thông tin',
+                    'score': 0,
+                    'confidence': 'medium',
+                    'matched_symptoms': []
+                }
+                
+                drugs.append(drug_info)
+            
+            # Thông tin phân trang (giữ nguyên)
+            total_drugs = len(filtered_df)
+            total_pages = (total_drugs + per_page - 1) // per_page if total_drugs > 0 else 1
+            
+            pagination_info = {
+                'page': page,
+                'per_page': per_page,
+                'total': total_drugs,
+                'total_pages': total_pages,
+                'has_prev': page > 1,
+                'has_next': page < total_pages,
+                'prev_num': page - 1 if page > 1 else None,
+                'next_num': page + 1 if page < total_pages else None
+            }
+        else:
+            pagination_info = {
+                'page': 1, 'per_page': 50, 'total': 0, 'total_pages': 0,
+                'has_prev': False, 'has_next': False, 'prev_num': None, 'next_num': None
+            }
+        
+        # Lấy thông tin user
+        user = None
+        if 'user_id' in session:
+            user = {
+                'user_id': session['user_id'],
+                'username': session['username'],
+                'full_name': session['full_name'],
+                'role': session['role']
+            }
+        
+        return render_template('drugs_list.html', 
+                             drugs=drugs,
+                             search=search,
+                             pagination=pagination_info,
+                             user=user)
+                             
+    except Exception as e:
+        print(f"Error in all_drugs: {e}")
+        flash(f'Lỗi tải danh sách thuốc: {str(e)}', 'error')
+        return redirect(url_for('index'))
 
 
 
+# =========================== ADMIN =================================
 @app.route('/admin/drugs')
 @admin_required
 def admin_drugs():
-    """Trang quản lý thuốc đơn giản"""
-    search = request.args.get('search', '')
-    drugs = get_all_drugs(search if search else None)
-    
-    return render_template('admin/drug_management.html',
-                         drugs=drugs,
-                         search=search,
-                         user=session)
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        per_page = 20  # Số thuốc mỗi trang
+        
+        # Lấy tất cả thuốc
+        all_drugs = get_all_drugs(search if search else None, 'both')
+        
+        # Phân trang
+        total_drugs = len(all_drugs)
+        total_pages = math.ceil(total_drugs / per_page) if total_drugs > 0 else 1
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        drugs = all_drugs[start_idx:end_idx]
+        
+        # Pagination info
+        pagination = {
+            'page': page,
+            'per_page': per_page,
+            'total': total_drugs,
+            'total_pages': total_pages,
+            'has_prev': page > 1,
+            'has_next': page < total_pages,
+            'prev_num': page - 1 if page > 1 else None,
+            'next_num': page + 1 if page < total_pages else None
+        }
+        
+        return render_template('admin/drug_management.html',
+                             drugs=drugs,
+                             search=search,
+                             pagination=pagination,
+                             user=session)
+                             
+    except Exception as e:
+        print(f"Error in admin_drugs: {e}")
+        flash(f'Lỗi tải danh sách thuốc: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/drug/add', methods=['GET', 'POST'])
 @admin_required
 def add_drug():
-    """Thêm thuốc mới đơn giản"""
+    """Thêm thuốc mới """
     if request.method == 'POST':
         try:
             drug_name = request.form.get('drug_name', '').strip()
@@ -916,7 +1010,7 @@ def add_drug():
 @app.route('/admin/drug/delete/<int:drug_id>', methods=['POST'])
 @admin_required
 def delete_drug_route(drug_id):
-    """Xóa thuốc đơn giản"""
+    """Xóa thuốc"""
     try:
         if delete_drug(drug_id):
             flash('Đã xóa thuốc thành công', 'success')
@@ -926,6 +1020,68 @@ def delete_drug_route(drug_id):
         flash(f'Lỗi xóa thuốc: {str(e)}', 'error')
     
     return redirect(url_for('admin_drugs'))
+
+
+@app.route('/admin/stats')
+@admin_required  # Chỉ admin mới xem được
+def stats():
+    """Trang thống kê"""
+    try:
+        # Lấy thống kê cơ bản
+        basic_stats = get_stats()
+        
+        # Lấy thêm một số thống kê đơn giản
+        conn = get_db()
+        
+        # Thống kê trong 7 ngày gần đây
+        recent_stats = conn.execute('''
+            SELECT 
+                COUNT(*) as searches_7days,
+                COUNT(DISTINCT user_id) as active_users
+            FROM search_logs 
+            WHERE search_time >= date('now', '-7 days')
+        ''').fetchone()
+        
+        # Top 5 triệu chứng phổ biến
+        top_symptoms = conn.execute('''
+            SELECT symptoms, COUNT(*) as count
+            FROM search_logs 
+            GROUP BY LOWER(symptoms)
+            ORDER BY count DESC 
+            LIMIT 5
+        ''').fetchall()
+        
+        # Thống kê thuốc đã lưu
+        saved_stats = conn.execute('''
+            SELECT 
+                COUNT(*) as total_saved,
+                COUNT(DISTINCT user_id) as users_with_saved
+            FROM saved_drugs
+        ''').fetchone()
+        
+        conn.close()
+        
+        # Chuẩn bị data đơn giản
+        stats_data = {
+            'total_users': basic_stats['total_users'],
+            'total_searches': basic_stats['total_searches'],
+            'searches_7days': recent_stats['searches_7days'] if recent_stats else 0,
+            'active_users': recent_stats['active_users'] if recent_stats else 0,
+            'total_saved': saved_stats['total_saved'] if saved_stats else 0,
+            'users_with_saved': saved_stats['users_with_saved'] if saved_stats else 0,
+            'top_symptoms': [dict(row) for row in top_symptoms],
+            'recent_searches': basic_stats.get('recent_searches', [])
+        }
+        
+        return render_template('admin/stats.html', 
+                             stats=stats_data,
+                             user=session)
+                             
+    except Exception as e:
+        print(f"Error in stats: {e}")
+        flash(f'Lỗi tải thống kê: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

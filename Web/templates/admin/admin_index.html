@@ -28,7 +28,7 @@
         
         <div class="stat-card">
             <h3><i class="fas fa-pills"></i> Thuốc trong hệ thống</h3>
-            <div class="stat-value">5,000+</div>
+            <div class="stat-value">{{ stats.total_drugs}}</div>
         </div>
         
         <div class="stat-card">
@@ -37,27 +37,27 @@
         </div>
     </div>
 
-    <!-- Quick Actions - Đơn giản hóa -->
+    <!-- Quick Actions -->
     <div class="quick-actions-section">
         <h3><i class="fas fa-bolt"></i> Thao tác nhanh</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <div class= "quick-actions-grid">
             
             <!-- Quản lý thuốc -->
             <div style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 4px solid #e74c3c;">
                 <h4><i class="fas fa-pills" style="color: #e74c3c;"></i> Quản lý Database Thuốc</h4>
                 <p>Thêm, sửa, xóa thông tin thuốc</p>
-                <a href="{{ url_for('admin_drugs') }}" style="background: #e74c3c; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-size: 14px;">
+                <a href="{{ url_for('admin_drugs') }}" style="background: #e74c3c; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-size: 14px;float: right;">
                     <i class="fas fa-arrow-right"></i> Truy cập
                 </a>
             </div>
             
-            <!-- Placeholder cards -->
-            <div style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 4px solid #f39c12;">
-                <h4><i class="fas fa-upload" style="color: #f39c12;"></i> Import CSV/Excel</h4>
+            <!-- Thống kê -->
+            <div style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 4px solid #27ae60;">
+                <h4><i class="fas fa-chart-bar" style="color: #27ae60;"></i> Thống kê hoạt động</h4>
                 <p>Nhập liệu hàng loạt từ file</p>
-                <span style="background: #f39c12; color: white; padding: 8px 15px; border-radius: 6px; font-size: 14px;">
-                    Đang phát triển
-                </span>
+                <a href="{{ url_for('stats') }}" style="background: #27ae60; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-size: 14px;float: right;">
+                    <i class="fas fa-arrow-right"></i> Truy cập
+                </a>
             </div>
             
         </div>
@@ -92,12 +92,6 @@
 
     <!-- Admin Actions -->
     <div class="admin-actions">
-        <a href="{{ url_for('admin_drugs') }}" class="btn-admin">
-            <i class="fas fa-pills"></i> Quản lý database thuốc
-        </a>
-        <a href="{{ url_for('stats') }}" class="btn-admin">
-            <i class="fas fa-chart-bar"></i> Xem thống kê chi tiết
-        </a>
         <a href="{{ url_for('index') }}" class="btn-admin">
             <i class="fas fa-home"></i> Về trang chủ
         </a>

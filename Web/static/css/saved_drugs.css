@@ -49,6 +49,11 @@
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     transition: all 0.3s ease;
     border-left: 4px solid #3498db;
+    
+    display: flex;
+    flex-direction: column;
+    min-height: 320px; /* Cố định chiều cao tối thiểu */
+    max-height: 380px; /* Cố định chiều cao tối đa */
 }
 
 .saved-drug-card:hover {
@@ -56,12 +61,43 @@
     box-shadow: 0 8px 25px rgba(0,0,0,0.15);
 }
 
-.drug-name {
-    font-size: 1.3em;
+
+.saved-drug-card .drug-header,
+.saved-drug-card .saved-info,
+.saved-drug-card .notes-section {
+    flex: 0 0 auto; /* Không giãn */
+}
+
+
+
+
+.saved-drug-card .drug-name {
+    font-size: 1.1em;
     font-weight: bold;
     color: #2c3e50;
     margin-bottom: 8px;
+    line-height: 1.3;
+    
+ 
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    
+
+    min-height: 2.6em; 
+    max-height: 2.6em; 
+    overflow: hidden;
+
+    word-break: break-word;
+    word-wrap: break-word;
+    hyphens: auto;
+    
+
+    position: relative;
 }
+
+
+
 
 .drug-class {
     background: linear-gradient(45deg, #e9ecef, #f8f9fa);
@@ -224,12 +260,13 @@
     line-height: 1.4;
 }
 
-/* Ensure consistent button layout */
-.saved-drug-card .drug-actions {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-top: 20px;
+
+
+.saved-drugs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 25px;
+    align-items: stretch; /* Giãn tất cả card cùng chiều cao */
 }
 
 .saved-drug-card .btn {
@@ -250,10 +287,21 @@
     content: '';
 }
 
+.saved-drug-card::after {
+    content: '';
+    flex: 1; 
+}
+
 @media (max-width: 768px) {
     .saved-drug-card .drug-actions {
-        flex-direction: column;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: auto; 
+        padding-top: 15px;
+        border-top: 1px solid #f1f1f1; /* Đường phân cách */
     }
+    
     
     .saved-drug-card .btn {
         flex: none;

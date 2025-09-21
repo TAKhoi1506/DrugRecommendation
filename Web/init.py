@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import pandas as pd
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -7,13 +8,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'simple_app.db')
 
 def init_database():
-    """Khởi tạo cơ sở dữ liệu đơn giản"""
+    """Khởi tạo cơ sở dữ liệu"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Bảng users đơn giản
+    # Bảng users
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,7 +26,7 @@ def init_database():
         )
     ''')
     
-    # Bảng search logs đơn giản  
+    # Bảng search logs 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS search_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,12 +158,20 @@ def log_search(user_id, symptoms, results_count,user_agent):
     conn.close()
 
 def get_stats():
-    """Lấy thống kê đơn giản"""
     conn = get_db()
     
     total_users = conn.execute('SELECT COUNT(*) FROM users WHERE role != "admin"').fetchone()[0]
     total_searches = conn.execute('SELECT COUNT(*) FROM search_logs').fetchone()[0]
+    dataset_count = 0
+    try:
+        from app import engine
+        if hasattr(engine, 'data_final') and engine.data_final is not None:
+            dataset_count = len(engine.data_final)
+    except:
+        dataset_count = 0
     
+    total_drugs = dataset_count
+
     recent_searches = conn.execute('''
         SELECT sl.symptoms, sl.results_count, sl.search_time, u.username
         FROM search_logs sl
@@ -175,6 +184,7 @@ def get_stats():
     return {
         'total_users': total_users,
         'total_searches': total_searches,
+        'total_drugs': total_drugs,
         'recent_searches': recent_searches
     }
 
@@ -372,27 +382,70 @@ def change_password(user_id, current_password, new_password):
 
 
 
-def get_all_drugs(search_term=None):
-    """Lấy danh sách thuốc đơn giản"""
+def get_all_drugs(search_term=None, source='both'):
+    """Lấy danh sách thuốc từ cả dataset và drugs_master"""
+    
+    # Lấy từ drugs_master
     conn = get_db()
     
     if search_term:
-        drugs = conn.execute('''
-            SELECT id, drug_name, drug_class, ingredients, indication, created_at
+        drugs_master = conn.execute('''
+            SELECT id, drug_name, drug_class, ingredients, indication, created_at, 'manual' as source
             FROM drugs_master 
             WHERE drug_name LIKE ? OR ingredients LIKE ?
             ORDER BY created_at DESC
         ''', (f'%{search_term}%', f'%{search_term}%')).fetchall()
     else:
-        drugs = conn.execute('''
-            SELECT id, drug_name, drug_class, ingredients, indication, created_at
+        drugs_master = conn.execute('''
+            SELECT id, drug_name, drug_class, ingredients, indication, created_at, 'manual' as source
             FROM drugs_master 
             ORDER BY created_at DESC
-            LIMIT 50
-        ''', ).fetchall()
+        ''').fetchall()
     
     conn.close()
-    return [dict(drug) for drug in drugs]
+    
+    # Lấy từ dataset
+    dataset_drugs = []
+    
+    try:
+        from app import engine
+        
+        if hasattr(engine, 'data_final') and engine.data_final is not None:
+            df = engine.data_final
+            
+            # Filter by search term
+            if search_term:
+                mask = df['ten_thuoc'].astype(str).str.contains(search_term, case=False, na=False) | \
+                       df['chi_dinh'].astype(str).str.contains(search_term, case=False, na=False)
+                df = df[mask]
+            
+            # Convert dataset to list
+            for idx, row in df.iterrows():
+                drug_name = str(row['ten_thuoc']) if pd.notna(row['ten_thuoc']) else f"Thuốc {idx}"
+                
+                dataset_drugs.append({
+                    'id': idx,
+                    'drug_name': drug_name,
+                    'drug_class': 'Dataset',  
+                    'ingredients': str(row.get('thanh_phan', '')) if pd.notna(row.get('thanh_phan')) else None,
+                    'indication': str(row.get('chi_dinh', '')) if pd.notna(row.get('chi_dinh')) else None,
+                    'source': 'dataset',
+                    'created_at': None
+                })
+                
+    except Exception as e:
+        print(f"Error loading dataset: {e}")
+    
+    # Kết hợp và trả về
+    all_drugs = [dict(drug) for drug in drugs_master] + dataset_drugs
+    
+    if source == 'manual':
+        return [dict(drug) for drug in drugs_master]
+    elif source == 'dataset':
+        return dataset_drugs
+    else:
+        return all_drugs
+
 
 def add_drug(drug_name, drug_class, ingredients, indication):
     """Thêm thuốcn"""
@@ -428,4 +481,4 @@ if __name__ == "__main__":
     current_module = inspect.getmembers(inspect.getmodule(inspect.currentframe()))
     for name, obj in current_module:
         if inspect.isfunction(obj):
-            print(f"  - {name}")
+            print(f"- {name}")
